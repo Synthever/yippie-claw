@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git rm *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(npm create *)",
+      "Bash(rm -f src/assets/hero.png src/assets/react.svg src/assets/vite.svg public/icons.svg)",
+      "Bash(npm install *)",
+      "Bash(npm --prefix D:/Github/yippie-claw/web run build)"
+    ]
+  }
+}

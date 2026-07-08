@@ -79,15 +79,33 @@ npm run start
 - [x] **M1** — Buktikan koneksi ke Gateway (handshake, `models.list`, kirim tugas ke agent)
 - [x] **M2** — Bungkus jadi backend service: `GatewayClient` reusable + endpoint `/api/models` & `/api/health`
 - [x] **M3a** — Chat streaming end-to-end: `POST /api/chat` (SSE) + halaman tes `/` ✅
-- [ ] **M3b** — Bungkus jadi frontend Next.js (chat room beneran)
+- [x] **M3b** — Frontend Vite + React (`web/`): chat room streaming ✅
 - [ ] **M4** — Kelola & bikin agent (`agents.*`), routing model per-tugas (Fable 5 seperlunya)
 - [ ] **M5** — Dashboard + visual "kamar" agent mengerjakan task A/B/C (pakai `tasks.*` / `cron.*`)
+
+## Frontend (`web/`)
+
+Vite + React SPA. Dev server sendiri, proxy `/api` → backend `:3001`.
+
+```bash
+# terminal 1 — backend
+npm run dev
+# terminal 2 — frontend
+cd web && npm install && npm run dev   # buka http://localhost:5173
+```
+
+Streaming dibaca via `fetch`-stream (bukan `EventSource`, karena `/api/chat` itu POST). Lihat [web/src/api.ts](web/src/api.ts).
 
 ## Struktur
 
 ```
-src/
-├── server.ts            # Fastify server + endpoint
+src/                     # backend
+├── server.ts            # Fastify server + endpoint (/api/chat SSE, /api/models, /api/health)
 └── gateway/
     └── client.ts        # GatewayClient: koneksi persistent, call() await, event streaming
+web/                     # frontend (Vite + React)
+├── vite.config.ts       # proxy /api → :3001
+└── src/
+    ├── App.tsx          # chat room
+    └── api.ts           # streamChat(): fetch-stream SSE reader
 ```
