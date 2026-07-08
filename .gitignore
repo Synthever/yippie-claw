@@ -1,0 +1,11 @@
+node_modules/
+dist/
+
+# Rahasia — JANGAN pernah commit .env (isinya token Gateway)
+.env
+.env.local
+
+# Device identity lokal dari probe
+.yippie-claw/
+
+*.log
