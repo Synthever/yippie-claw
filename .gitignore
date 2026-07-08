@@ -8,4 +8,7 @@ dist/
 # Device identity lokal dari probe
 .yippie-claw/
 
+# Settings lokal editor/agent
+.claude/settings.local.json
+
 *.log
