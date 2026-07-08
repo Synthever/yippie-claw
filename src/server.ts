@@ -33,6 +33,11 @@ async function main() {
     }));
   });
 
+  // Halaman tes chat (langkah 2 M3). ponytail: 1 route inline, ganti Next.js kalau stream udah kebukti.
+  app.get("/", async (_req, reply) => {
+    reply.type("text/html").send(CHAT_TEST_HTML);
+  });
+
   // Chat streaming: kirim tugas ke agent, teruskan jawaban ke browser via SSE.
   // Body: { message, sessionKey? }. sessionKey stabil = konteks percakapan nyambung.
   app.post<{ Body: { message?: string; sessionKey?: string } }>("/api/chat", async (req, reply) => {
@@ -82,3 +87,54 @@ main().catch((err) => {
   console.error(err);
   process.exit(1);
 });
+
+// Halaman tes minimal: kirim pesan, baca SSE via fetch-stream (bukan EventSource — itu GET-only).
+const CHAT_TEST_HTML = `<!doctype html>
+<html lang="id"><head><meta charset="utf-8"><title>Yippie-Claw chat tes</title>
+<style>
+  body{font:16px system-ui;max-width:640px;margin:2rem auto;padding:0 1rem}
+  #log{border:1px solid #ccc;border-radius:8px;padding:1rem;min-height:200px;white-space:pre-wrap}
+  .row{display:flex;gap:.5rem;margin-top:1rem}
+  input{flex:1;padding:.5rem} button{padding:.5rem 1rem}
+</style></head><body>
+<h1>Yippie-Claw 🐾 chat tes</h1>
+<div id="log"></div>
+<div class="row">
+  <input id="msg" placeholder="Ketik pesan..." autofocus>
+  <button id="send">Kirim</button>
+</div>
+<script>
+const log = document.getElementById("log");
+const input = document.getElementById("msg");
+const btn = document.getElementById("send");
+const sessionKey = "web-" + Math.random().toString(36).slice(2); // konteks tetap se-sesi tab
+
+async function send() {
+  const message = input.value.trim();
+  if (!message) return;
+  input.value = ""; btn.disabled = true;
+  log.textContent += "\\n\\n🧑 " + message + "\\n🤖 ";
+  const res = await fetch("/api/chat", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message, sessionKey }),
+  });
+  const reader = res.body.getReader();
+  const dec = new TextDecoder();
+  let buf = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    const blocks = buf.split("\\n\\n"); buf = blocks.pop(); // sisa belum lengkap
+    for (const b of blocks) {
+      const ev = /event: (\\w+)/.exec(b)?.[1];
+      const data = /data: (.+)/.exec(b)?.[1];
+      if (ev === "delta") log.textContent += JSON.parse(data).text;
+      else if (ev === "error") log.textContent += "[error] " + data;
+    }
+  }
+  btn.disabled = false; input.focus();
+}
+btn.onclick = send;
+input.onkeydown = (e) => { if (e.key === "Enter") send(); };
+</script></body></html>`;
