@@ -13,11 +13,6 @@ async function main() {
   await gw.whenReady();
   console.log("✅ Gateway siap\n");
 
-  // Pilih agent pertama yang tersedia (biar ga usah hardcode id).
-  const models = await gw.listModels();
-  const agent = models.find((m) => m.available ?? true) ?? models[0];
-  console.log(`🎯 Pakai agent: ${agent?.alias ?? agent?.id}\n`);
-
   // Dengarkan SEMUA event mentah — biar kelihatan struktur aslinya apa adanya.
   let count = 0;
   gw.on("event:agent", (payload) => {
@@ -25,8 +20,9 @@ async function main() {
     console.dir(payload, { depth: null });
   });
 
+  // Tanpa override model — caller loopback ga diizinin (INVALID_REQUEST), Gateway pakai default.
   const sessionKey = `peek-${Date.now()}`;
-  const ack = await gw.runAgent(sessionKey, message, agent?.id ? { model: agent.id } : {});
+  const ack = await gw.runAgent(sessionKey, message);
   console.log("📨 ack runAgent:");
   console.dir(ack, { depth: null });
   console.log(`\n⏳ Nunggu stream event (runId=${ack.runId})... auto-exit 30 detik.\n`);
