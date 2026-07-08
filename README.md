@@ -20,6 +20,20 @@ Gateway di VPS default-nya loopback-only. Backend Yippie-Claw jalan di VPS yang 
 - Auth: jalur **backend loopback** — `client.id: "gateway-client"`, `mode: "backend"`, `role: "operator"`, pakai shared token. Device boleh diomit di loopback.
 - Handshake sukses ditandai `res` dengan `payload.type === "hello-ok"`.
 - `models.list` → daftar model/agent. `agent` → kirim tugas (asinkron: balik `{ runId, status: "accepted" }`, hasilnya streaming lewat event `agent`).
+- **Override model TIDAK diizinkan** untuk caller loopback (`INVALID_REQUEST` "provider/model overrides are not authorized"). Jangan kirim param `model` — Gateway pakai default agent.
+
+#### Bentuk event `agent` (hasil ngintip, terverifikasi)
+
+Tiap tugas nyembur beberapa event `agent` dengan field kunci: `runId`, `stream`, `data`, `seq` (urutan), `ts`. Filter berdasarkan `runId` (bisa ada run paralel).
+
+| `stream` | `data` | Artinya |
+|----------|--------|---------|
+| `lifecycle` | `{ phase: "start" }` | Mulai |
+| `assistant` | `{ text, delta }` | **Teks jawaban** — `delta` = potongan baru, `text` = akumulasi |
+| `lifecycle` | `{ phase: "finishing", stopReason }` | Hampir kelar |
+| `lifecycle` | `{ phase: "end", stopReason, aborted }` | **Selesai** → tutup stream |
+
+Streaming = append tiap `data.delta` sampai lifecycle `phase: "end"`.
 
 ## Setup
 
@@ -35,8 +49,10 @@ Token diambil dari Gateway (config `gateway.auth.token` / env `OPENCLAW_GATEWAY_
 
 | Method | Path           | Fungsi                                   |
 |--------|----------------|------------------------------------------|
+| GET    | `/`            | Halaman tes chat (SSE via fetch-stream)  |
 | GET    | `/api/health`  | Status Gateway (plugin, channel, agent)  |
 | GET    | `/api/models`  | Daftar 10 agent (id, alias, contextWindow) |
+| POST   | `/api/chat`    | Kirim `{ message, sessionKey? }` → stream SSE (`event: delta` / `done`) |
 
 Tes cepat:
 
@@ -62,7 +78,8 @@ npm run start
 
 - [x] **M1** — Buktikan koneksi ke Gateway (handshake, `models.list`, kirim tugas ke agent)
 - [x] **M2** — Bungkus jadi backend service: `GatewayClient` reusable + endpoint `/api/models` & `/api/health`
-- [ ] **M3** — Frontend Next.js + chat room streaming pertama (pakai event `agent`)
+- [x] **M3a** — Chat streaming end-to-end: `POST /api/chat` (SSE) + halaman tes `/` ✅
+- [ ] **M3b** — Bungkus jadi frontend Next.js (chat room beneran)
 - [ ] **M4** — Kelola & bikin agent (`agents.*`), routing model per-tugas (Fable 5 seperlunya)
 - [ ] **M5** — Dashboard + visual "kamar" agent mengerjakan task A/B/C (pakai `tasks.*` / `cron.*`)
 
