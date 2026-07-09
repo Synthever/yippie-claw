@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, type Tool } from '../api'
+import { asList, pick } from '../lib/data'
 
 export default function ToolsView() {
   const [tools, setTools] = useState<Tool[]>([])
@@ -11,11 +12,13 @@ export default function ToolsView() {
   useEffect(() => {
     api.tools()
       .then((data) => {
-        const arr = Array.isArray(data)
-          ? data
-          : typeof data === 'object' && data !== null
-            ? Object.values(data as Record<string, Tool>)
-            : []
+        const arr = asList(data).map((t: any, i: number) => ({
+          ...t,
+          name: pick<string>(t, 'name', 'id', 'tool', 'key', '__key') ?? `tool-${i}`,
+          category: pick<string>(t, 'category', 'group', 'namespace', 'type'),
+          description: pick<string>(t, 'description', 'desc', 'summary', 'title'),
+          enabled: pick<boolean>(t, 'enabled', 'available', 'active'),
+        }))
         setTools(arr as Tool[])
       })
       .catch((e) => setError(e.message))

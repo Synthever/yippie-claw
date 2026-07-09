@@ -1,9 +1,23 @@
 import { useEffect, useState } from 'react'
 import { api, type Agent } from '../api'
+import { asList, pick } from '../lib/data'
 
 interface ModalState {
   mode: 'create' | 'edit'
   agent?: Agent
+}
+
+/** Gateway agents use `agentId`; normalize to a canonical shape the table expects. */
+function normalizeAgent(a: any, i: number): Agent {
+  const id = pick<string>(a, 'id', 'agentId', 'name', '__key') ?? `agent-${i}`
+  return {
+    ...a,
+    id,
+    name: pick<string>(a, 'name', 'displayName', 'label', 'agentId') ?? id,
+    model: pick<string>(a, 'model', 'modelId', 'defaultModel', 'alias'),
+    description: pick<string>(a, 'description', 'desc', 'summary', 'prompt'),
+    status: pick<string>(a, 'status', 'state') ?? (pick(a, 'enabled') === false ? 'stopped' : undefined),
+  }
 }
 
 export default function AgentsView() {
@@ -18,7 +32,7 @@ export default function AgentsView() {
     setLoading(true)
     try {
       const data = await api.agentsList()
-      setAgents(Array.isArray(data) ? data : Object.values(data as any))
+      setAgents(asList(data).map(normalizeAgent))
     } catch (e: any) { setError(e.message) }
     setLoading(false)
   }

@@ -22,11 +22,12 @@ interface Props {
   active: View
   onChange: (v: View) => void
   gwOk: boolean
+  open?: boolean
 }
 
-export default function Sidebar({ active, onChange, gwOk }: Props) {
+export default function Sidebar({ active, onChange, gwOk, open }: Props) {
   return (
-    <nav className="sidebar">
+    <nav className={`sidebar${open ? ' open' : ''}`}>
       <div className="sidebar-logo">
         <div className="logo-icon">🐾</div>
         <span>Yippie-Claw</span>

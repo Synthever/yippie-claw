@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { asList } from '../lib/data'
 
 export interface LogEntry {
   ts?: string
@@ -9,6 +10,13 @@ export interface LogEntry {
 }
 
 const MAX_LINES = 500
+
+/** Gateway log entries may be plain strings or objects — normalize to LogEntry. */
+function toEntry(x: unknown): LogEntry {
+  if (typeof x === 'string') return { msg: x }
+  if (x && typeof x === 'object') return x as LogEntry
+  return { msg: String(x) }
+}
 
 /** Subscribe to /api/logs/stream SSE. Returns live log entries. */
 export function useLogs(enabled = true) {
@@ -35,15 +43,13 @@ export function useLogs(enabled = true) {
       es.addEventListener('tail', (ev: Event) => {
         try {
           const data = JSON.parse((ev as MessageEvent).data)
-          const arr: LogEntry[] = Array.isArray(data) ? data : (data?.logs ?? data?.lines ?? [])
-          addLines(arr)
+          addLines(asList(data).map(toEntry))
         } catch {}
       })
 
       es.addEventListener('log', (ev: Event) => {
         try {
-          const entry = JSON.parse((ev as MessageEvent).data)
-          addLines([entry])
+          addLines([toEntry(JSON.parse((ev as MessageEvent).data))])
         } catch {}
       })
 

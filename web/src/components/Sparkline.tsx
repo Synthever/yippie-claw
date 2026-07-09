@@ -5,10 +5,11 @@ interface Props {
   color?: string
 }
 
-/** Tiny SVG sparkline — no deps */
+/** Tiny SVG sparkline — no deps. Fills its container width; `width` is only the
+ *  coordinate space for the path. */
 export default function Sparkline({ values, width = 160, height = 36, color = '#aa3bff' }: Props) {
   if (values.length < 2) {
-    return <svg width={width} height={height} />
+    return <svg width="100%" height={height} style={{ display: 'block' }} />
   }
   const max = Math.max(...values, 1)
   const pts = values.map((v, i) => {
@@ -20,7 +21,7 @@ export default function Sparkline({ values, width = 160, height = 36, color = '#
   const area = `M ${pts[0]} L ${pts.join(' L ')} L ${width},${height} L 0,${height} Z`
 
   return (
-    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ display: 'block' }}>
+    <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" style={{ display: 'block' }}>
       <defs>
         <linearGradient id={`sg-${color.replace('#','')}`} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={color} stopOpacity="0.3" />

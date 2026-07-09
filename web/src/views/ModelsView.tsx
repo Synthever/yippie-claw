@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { api, type Model } from '../api'
+import { api, type Model, fmtTs } from '../api'
+import { asList, pick } from '../lib/data'
 
 export default function ModelsView() {
   const [models, setModels] = useState<Model[]>([])
@@ -46,33 +47,7 @@ export default function ModelsView() {
         {error && <div className="badge danger">{error}</div>}
 
         {/* Auth status */}
-        {auth && (
-          <div className="card">
-            <div className="card-header"><span className="card-title">Provider Auth Status</span></div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-              {Object.entries(auth).map(([provider, status]) => (
-                <div key={provider} className="flex-row" style={{
-                  background: 'var(--bg-hover)',
-                  padding: '8px 14px',
-                  borderRadius: 8,
-                  gap: 10,
-                }}>
-                  <span style={{ color: 'var(--text-h)', fontWeight: 500, fontSize: 13 }}>{provider}</span>
-                  <span className={`badge ${
-                    status === true || (status as any)?.ok === true || (status as any)?.authenticated === true
-                      ? 'success' : 'neutral'
-                  }`}>
-                    {typeof status === 'boolean'
-                      ? (status ? 'authed' : 'not authed')
-                      : typeof status === 'object'
-                        ? ((status as any).authenticated ? 'authed' : (status as any).ok ? 'ok' : JSON.stringify(status).slice(0, 30))
-                        : String(status)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        {auth && <AuthCard auth={auth} />}
 
         {/* Model table */}
         {loading ? (
@@ -117,6 +92,41 @@ export default function ModelsView() {
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+function AuthCard({ auth }: { auth: Record<string, unknown> }) {
+  // Shape seen from Gateway: { ts, providers: [{ provider, display, authenticated|ok, ... }] }
+  const providers = asList(pick(auth, 'providers') ?? auth)
+  const ts = pick<number>(auth, 'ts', 'updatedAt', 'checkedAt')
+
+  return (
+    <div className="card">
+      <div className="card-header">
+        <span className="card-title">Provider Auth Status</span>
+        {ts != null && <span className="text-muted text-sm">as of {fmtTs(ts)}</span>}
+      </div>
+      {providers.length === 0 ? (
+        <div className="text-muted text-sm">No provider info reported.</div>
+      ) : (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+          {providers.map((p: any, i: number) => {
+            const name = pick<string>(p, 'provider', 'name', 'id', 'display', '__key') ?? `#${i}`
+            const authed = pick(p, 'authenticated', 'ok', 'authed', 'valid', 'value')
+            const isOk = authed === true || /ok|authed|valid|active/i.test(String(authed ?? ''))
+            const label = typeof authed === 'boolean'
+              ? (authed ? 'authed' : 'not authed')
+              : String(authed ?? 'unknown')
+            return (
+              <div key={i} className="flex-row" style={{ background: 'var(--bg-hover)', padding: '8px 14px', borderRadius: 8, gap: 10 }}>
+                <span style={{ color: 'var(--text-h)', fontWeight: 500, fontSize: 13 }}>{name}</span>
+                <span className={`badge ${isOk ? 'success' : 'neutral'}`}>{label}</span>
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { api, type Session, streamChat } from '../api'
+import { asList, pick } from '../lib/data'
 
 interface Msg { role: 'user' | 'assistant'; text: string }
 
@@ -15,7 +16,10 @@ export default function ActivityView() {
 
   useEffect(() => {
     api.sessionsList().then((data) => {
-      const arr = Array.isArray(data) ? data : Object.values(data as any)
+      const arr = asList(data).map((s: any, i: number) => ({
+        ...s,
+        id: String(pick(s, 'id', 'sessionKey', 'key', 'sessionId', '__key') ?? `session-${i}`),
+      }))
       setSessions(arr as Session[])
     }).catch(() => null)
   }, [])

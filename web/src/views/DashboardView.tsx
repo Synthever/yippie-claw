@@ -2,26 +2,34 @@ import { useEffect, useState } from 'react'
 import { useSystem } from '../hooks/useSystem'
 import Sparkline from '../components/Sparkline'
 import { api, fmtBytes, fmtUptime } from '../api'
+import { asList, pick, fmtVal, KV } from '../lib/data'
 
 function pct(n: number) { return n.toFixed(0) + '%' }
 function fillClass(v: number) { return v > 80 ? 'high' : v > 60 ? 'medium' : 'low' }
 
-interface GwStatus { version?: string; agents?: number; sessions?: number; [k: string]: unknown }
-interface UsageData { status?: { tokensUsed?: number; cost?: number }; cost?: unknown }
-interface ChannelData { name?: string; status?: string; type?: string; [k: string]: unknown }
+interface UsageData { status?: unknown; cost?: unknown }
+
+function channelStatus(ch: any): { label: string; ok: boolean } | null {
+  if (typeof ch === 'string') return null
+  const s = pick<string>(ch, 'status', 'state', 'health')
+  const running = pick<boolean>(ch, 'running', 'connected', 'enabled', 'active')
+  if (s != null) return { label: String(s), ok: /run|connect|ready|online|up|ok/i.test(String(s)) }
+  if (typeof running === 'boolean') return { label: running ? 'running' : 'stopped', ok: running }
+  return null
+}
 
 export default function DashboardView() {
   const { snap, history } = useSystem()
-  const [gwStatus, setGwStatus] = useState<GwStatus | null>(null)
+  const [gwStatus, setGwStatus] = useState<Record<string, unknown> | null>(null)
   const [usage, setUsage] = useState<UsageData | null>(null)
-  const [channels, setChannels] = useState<ChannelData[]>([])
+  const [channels, setChannels] = useState<any[]>([])
   const [sessions, setSessions] = useState<unknown[]>([])
 
   useEffect(() => {
     api.status().then(setGwStatus as any).catch(() => null)
     api.usage().then(setUsage as any).catch(() => null)
-    api.channels().then((d) => setChannels(Array.isArray(d) ? d as ChannelData[] : Object.values(d as any))).catch(() => null)
-    api.sessionsList().then(setSessions).catch(() => null)
+    api.channels().then((d) => setChannels(asList(d))).catch(() => null)
+    api.sessionsList().then((d) => setSessions(asList(d))).catch(() => null)
   }, [])
 
   const cpuH = history.map((h) => h.cpu)
@@ -96,7 +104,7 @@ export default function DashboardView() {
             <div className="stat-label">Channels</div>
             <div className="stat-value">{channels.length}</div>
             <div className="stat-sub">
-              {channels.filter((c) => c.status === 'running' || c.status === 'connected').length} active
+              {channels.filter((c) => channelStatus(c)?.ok).length} active
             </div>
           </div>
         </div>
@@ -124,16 +132,7 @@ export default function DashboardView() {
           <div className="card">
             <div className="card-header"><span className="card-title">Gateway Status</span></div>
             {gwStatus ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {Object.entries(gwStatus).slice(0, 10).map(([k, v]) => (
-                  <div key={k} className="flex-row" style={{ justifyContent: 'space-between' }}>
-                    <span className="text-muted text-sm">{k}</span>
-                    <span className="text-mono" style={{ color: 'var(--text-h)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {typeof v === 'object' ? JSON.stringify(v) : String(v)}
-                    </span>
-                  </div>
-                ))}
-              </div>
+              <KV data={gwStatus} />
             ) : <div className="empty-state" style={{ padding: '20px 0' }}>Loading…</div>}
           </div>
 
@@ -143,36 +142,97 @@ export default function DashboardView() {
               <div className="empty-state" style={{ padding: '20px 0' }}>No channels</div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {channels.map((ch, i) => (
-                  <div key={i} className="flex-row" style={{ justifyContent: 'space-between' }}>
-                    <span style={{ color: 'var(--text-h)', fontSize: 13 }}>{ch.name ?? ch.type ?? `#${i}`}</span>
-                    <span className={`badge ${ch.status === 'running' || ch.status === 'connected' ? 'success' : 'neutral'}`}>
-                      {ch.status ?? 'unknown'}
-                    </span>
-                  </div>
-                ))}
+                {channels.map((ch, i) => {
+                  const name = typeof ch === 'string'
+                    ? ch
+                    : (pick<string>(ch, 'name', 'id', 'type', 'channel', 'kind') ?? ch.__key ?? `#${i}`)
+                  const st = channelStatus(ch)
+                  const detail = typeof ch === 'string' ? '' : fmtVal({ ...ch, __key: undefined, name: undefined })
+                  return (
+                    <div key={i} className="flex-row" style={{ justifyContent: 'space-between', gap: 12 }}>
+                      <span style={{ color: 'var(--text-h)', fontSize: 13 }}>{name}</span>
+                      {st ? (
+                        <span className={`badge ${st.ok ? 'success' : 'neutral'}`}>{st.label}</span>
+                      ) : (
+                        <span className="text-muted text-sm" style={{ textAlign: 'right', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {detail || '—'}
+                        </span>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             )}
           </div>
         </div>
 
         {/* Usage */}
-        {usage && (
-          <div className="card">
-            <div className="card-header"><span className="card-title">Usage</span></div>
-            <div style={{ display: 'flex', gap: 32 }}>
-              {usage.status && Object.entries(usage.status).slice(0, 6).map(([k, v]) => (
-                <div key={k}>
-                  <div className="text-muted text-sm">{k}</div>
-                  <div style={{ color: 'var(--text-h)', fontWeight: 600, fontSize: 16 }}>
-                    {typeof v === 'number' ? v.toLocaleString() : String(v)}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        {usage && <UsageCard usage={usage} />}
       </div>
+    </div>
+  )
+}
+
+function num(v: unknown): number | undefined {
+  return typeof v === 'number' ? v : undefined
+}
+
+function UsageCard({ usage }: { usage: UsageData }) {
+  const status = (usage.status ?? {}) as Record<string, unknown>
+  // Scalar summary metrics (tokens, cost, requests…)
+  const scalars = Object.entries(status).filter(([, v]) => typeof v === 'number' || typeof v === 'string')
+  // Per-agent breakdown, whatever it is called
+  const perAgentRaw = pick(status, 'byAgent', 'agents', 'perAgent', 'usage') ?? pick(usage as any, 'byAgent')
+  const perAgent = perAgentRaw ? asList(perAgentRaw) : []
+
+  return (
+    <div className="card">
+      <div className="card-header"><span className="card-title">Usage</span></div>
+
+      {scalars.length > 0 && (
+        <div className="stat-grid" style={{ marginBottom: perAgent.length ? 18 : 0 }}>
+          {scalars.slice(0, 8).map(([k, v]) => (
+            <div key={k} className="stat-card" style={{ padding: '12px 14px' }}>
+              <div className="stat-label">{k}</div>
+              <div style={{ color: 'var(--text-h)', fontWeight: 700, fontSize: 18 }}>
+                {typeof v === 'number' ? v.toLocaleString() : String(v)}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {perAgent.length > 0 && (
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Agent</th><th>Tokens</th><th>Input</th><th>Output</th><th>Cost</th></tr>
+            </thead>
+            <tbody>
+              {perAgent.map((a: any, i: number) => {
+                const name = pick<string>(a, 'agentId', 'agent', 'id', 'name') ?? a.__key ?? `#${i}`
+                const total = num(pick(a, 'totalTokens', 'tokens', 'tokensUsed', 'value'))
+                const input = num(pick(a, 'inputTokens', 'input', 'promptTokens'))
+                const output = num(pick(a, 'outputTokens', 'output', 'completionTokens'))
+                const cost = num(pick(a, 'cost', 'costUsd', 'usd'))
+                return (
+                  <tr key={i}>
+                    <td className="text-mono" style={{ color: 'var(--text-h)' }}>{name}</td>
+                    <td>{total != null ? total.toLocaleString() : '—'}</td>
+                    <td className="text-muted">{input != null ? input.toLocaleString() : '—'}</td>
+                    <td className="text-muted">{output != null ? output.toLocaleString() : '—'}</td>
+                    <td className="text-muted">{cost != null ? `$${cost.toFixed(4)}` : '—'}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {scalars.length === 0 && perAgent.length === 0 && (
+        <div className="text-muted text-sm">No usage data reported.</div>
+      )}
     </div>
   )
 }

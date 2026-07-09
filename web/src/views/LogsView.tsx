@@ -10,9 +10,10 @@ function levelClass(level?: string): string {
 }
 
 function renderLine(entry: LogEntry, i: number) {
-  const ts = entry.ts ?? entry.time ?? ''
-  const level = entry.level ?? entry.lvl ?? ''
-  const msg = entry.msg ?? entry.message ?? JSON.stringify(entry)
+  const e = entry as Record<string, unknown>
+  const ts = (e.ts ?? e.time ?? e.timestamp ?? e.t ?? '') as string | number
+  const level = (e.level ?? e.lvl ?? e.severity ?? '') as string
+  const msg = (e.msg ?? e.message ?? e.text ?? e.line ?? e.content ?? JSON.stringify(entry)) as unknown
   const tsRaw = typeof ts === 'string' || typeof ts === 'number' ? ts : ''
   const tsStr = tsRaw ? new Date(tsRaw).toLocaleTimeString() : ''
 

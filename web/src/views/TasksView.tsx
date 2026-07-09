@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, type CronJob, type CronRun, fmtTs } from '../api'
+import { asList, pick } from '../lib/data'
 
 interface ModalState { mode: 'create' | 'edit'; job?: CronJob }
 
@@ -16,7 +17,12 @@ export default function TasksView() {
     setLoading(true)
     try {
       const data = await api.cronList()
-      setJobs(Array.isArray(data) ? data : Object.values(data as any))
+      setJobs(asList(data).map((j: any, i: number) => ({
+        ...j,
+        id: String(pick(j, 'id', 'name', 'jobId', '__key') ?? `job-${i}`),
+        name: pick<string>(j, 'name', 'label', 'title'),
+        schedule: pick<string>(j, 'schedule', 'cron', 'expression', 'expr'),
+      })))
     } catch (e: any) { setError(e.message) }
     setLoading(false)
   }
