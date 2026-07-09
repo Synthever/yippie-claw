@@ -130,7 +130,7 @@ async function main() {
 
   // Logs (one-shot tail)
   app.get<{ Querystring: { lines?: string } }>("/api/logs", async (req) =>
-    gw.call("logs.tail", { lines: Number(req.query.lines ?? 200) })
+    gw.call("logs.tail", { limit: Number(req.query.lines ?? 200) })
   );
 
   // System snapshot
@@ -165,7 +165,7 @@ async function main() {
 
     // Initial tail
     try {
-      const tail = await gw.call("logs.tail", { lines: Number(req.query.lines ?? 100) });
+      const tail = await gw.call("logs.tail", { limit: Number(req.query.lines ?? 100) });
       send("tail", tail);
     } catch (e: any) {
       send("error", { message: e?.message });
